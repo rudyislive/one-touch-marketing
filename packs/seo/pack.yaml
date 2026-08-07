@@ -1,0 +1,89 @@
+name: seo
+title: Search and generative engine optimization
+summary: >
+  Writes and edits the content, keeps it healthy in classic search and in AI
+  answers, and verifies what actually got indexed and read. Drafting through
+  publishing verification, one lane.
+
+agents:
+  - content-drafter      # host-preferred - one publish-ready piece per run, banner via social-visual pipeline
+  - copy-editor          # host-preferred - fresh-eyes rewrite against the voice, changes no facts
+  - faq-syncer           # cloud-safe     - lifts a published piece's FAQ into standalone entries
+  - per-publish          # cloud-safe     - post-publish verification, backward-link proposals
+  - link-applier         # host-preferred - applies approved internal links, nothing else
+  - indexing-checker     # host-only      - is the published thing actually indexed and read; interactive browser
+  - seo-audit            # cloud-safe     - monthly technical audit, read-only
+  - geo-steward          # cloud-safe     - weekly AI-answer/E-E-A-T hygiene, read-only
+  - aeo-trend            # cloud-safe     - AI-answer presence, trend-aggregated because single snapshots are noise
+
+state:
+  - calendar/content.md
+  - ledgers/published.md
+  - ledgers/internal-links.md
+  - reports/SEO-AUDIT.md
+  - reports/AEO-TREND.md
+
+capabilities:
+
+  - id: cms
+    slot: Publishing system
+    required_by: [content-drafter, copy-editor, faq-syncer, per-publish, link-applier]
+    on_absent: degrade
+    alternatives:
+      - name: Any CMS MCP or write API
+        note: Bind in binding/TOOLS.md. Drafts land in the CMS as unpublished drafts, never live.
+      - name: Git-based publishing
+        auth: none
+        note: Static sites. The draft is a file and a pull request; merging is publishing.
+      - name: Markdown to _QUEUE only
+        auth: none
+        note: Zero-setup default. Finished pieces arrive as cards with paste-ready front matter.
+    manual_fallback: >
+      The card carries the complete piece: title, slug, meta description, body,
+      FAQ block, image brief, alt text. Paste into any editor in the order given.
+
+  - id: seo-suite
+    slot: SEO and keyword platform
+    required_by: [seo-audit, aeo-trend, geo-steward]
+    on_absent: degrade
+    alternatives:
+      - name: Any SEO-suite MCP
+        note: Site audit, rank tracking, AI-visibility tracking, whichever suite is connected.
+      - name: Search-console and crawler data via WebFetch
+        auth: none
+        note: Thinner signal, still real. Audits degrade to crawl-what-is-public.
+    manual_fallback: >
+      The report names exactly which checks ran from public data and which need
+      a suite, so you know what you are not seeing.
+
+  - id: web-research
+    slot: Web search and fetch
+    required_by: [content-drafter, geo-steward]
+    on_absent: degrade
+    auth: none
+    alternatives:
+      - name: WebSearch and WebFetch
+        auth: none
+        note: Present in every supported runtime. This slot is effectively always green.
+
+  - id: browser
+    slot: Interactive browser
+    required_by: [indexing-checker]
+    on_absent: degrade
+    alternatives:
+      - name: Browser automation MCP
+        note: Reaches consoles that have no API. Host-only.
+    manual_fallback: >
+      The card lists the exact console URLs to open and the values to read,
+      with a table to fill in. Ten minutes monthly.
+
+schedule:
+  content-drafter:  { cadence: daily,   time: "07:45", placement: host }
+  copy-editor:      { cadence: daily,   time: "08:50", placement: host }
+  per-publish:      { cadence: daily,   time: "09:17", placement: cloud }
+  faq-syncer:       { cadence: daily,   time: "09:52", placement: cloud }
+  link-applier:     { cadence: weekly,  day: friday, time: "08:10", placement: host }
+  geo-steward:      { cadence: weekly,  day: thursday, time: "08:20", placement: cloud }
+  aeo-trend:        { cadence: weekly,  day: wednesday, time: "08:30", placement: cloud }
+  seo-audit:        { cadence: monthly, day: 1, time: "08:30", placement: cloud }
+  indexing-checker: { cadence: manual, placement: host }

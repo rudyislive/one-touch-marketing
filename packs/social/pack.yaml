@@ -1,0 +1,243 @@
+name: social
+title: Social media
+summary: >
+  Plans, writes, illustrates, schedules and measures social posts. Drafts replies
+  for you to send. Reads performance back into the next round of drafts.
+
+agents:
+  - social-listener      # cloud-safe  - what is worth posting about
+  - social-drafter       # cloud-safe  - one idea to platform-native variants
+  - social-visual        # host-only   - generates the scene, composites the brand layer
+  - social-publisher     # cloud-safe  - schedules approved cards
+  - social-engagement    # cloud-safe  - drafts replies, never sends
+  - social-performance   # cloud-safe  - what worked, fed back to the drafter
+
+state:
+  - calendar/social.md
+  - ledgers/social-published.md
+  - ledgers/social-engagement.md
+  - reports/SOCIAL-PERFORMANCE.md
+
+# ---------------------------------------------------------------------------
+# Platforms.
+#
+# Each platform is a profile file in reference/platforms/ carrying its native
+# shaping rules: formats, caption norms, hashtag conventions, link handling,
+# what earns reach and what gets throttled. The drafter and publisher read the
+# enabled profiles and never hardcode a platform.
+#
+# /onboard asks which to enable. None are mandatory. Adding a platform later is
+# adding a profile file and flipping it on in binding/TOOLS.md.
+# ---------------------------------------------------------------------------
+
+platforms:
+  supported: [instagram, facebook, x, reddit, linkedin, pinterest]
+  design_centre: image-first   # profiles assume the visual leads, copy supports
+  extensible: true             # a new profile file is a new platform, no code
+
+# ---------------------------------------------------------------------------
+# Capability slots.
+#
+# `alternatives` is RANKED. When the primary is absent, doctor and onboard walk
+# this list and bind the first thing the operator actually has, before ever
+# suggesting manual work. Entries marked `auth: none` need no account and no key,
+# which is why every slot that can have one, has one.
+#
+# `on_absent: degrade` means the agent still runs and still produces the work.
+# Nothing in this pack blocks on a missing capability.
+# ---------------------------------------------------------------------------
+
+capabilities:
+
+  - id: image-gen
+    slot: Image generation
+    required_by: [social-visual]
+    on_absent: degrade
+    alternatives:
+      - name: Higgsfield MCP
+        note: Reference implementation. Strongest for cinematic and 3D-character work.
+      - name: Any image-generation HTTP API
+        note: Bind the endpoint in binding/TOOLS.md. Quality varies, pipeline is identical.
+      - name: Local diffusion runtime
+        auth: none
+        note: Slower, free, fully offline.
+    manual_fallback: >
+      The card carries the complete scene prompt, the aspect ratio, and the
+      composite spec. Generate it anywhere you like, drop the file next to the
+      card, and the compositor picks it up.
+
+  - id: video-gen
+    slot: Video and motion
+    required_by: [social-visual]
+    on_absent: degrade
+    alternatives:
+      - name: Higgsfield MCP
+      - name: Any video-generation HTTP API
+      - name: Still image with motion applied by the compositor
+        auth: none
+        note: Ken Burns pan and zoom over the generated still. Adequate for most reel covers.
+
+  - id: compositor
+    slot: Local image composition
+    required_by: [social-visual]
+    on_absent: degrade
+    auth: none
+    alternatives:
+      - name: sharp
+        auth: none
+        note: Node. Installed with the framework. Default.
+      - name: ImageMagick
+        auth: none
+      - name: Pillow
+        auth: none
+    note: >
+      Load-bearing, not cosmetic. The generator renders the SCENE ONLY, with no
+      text in the prompt at all. Headline, logo, footer lockup, slide counter and
+      CTA bar are composited here afterward, using the operator's real fonts from
+      binding/. Three reasons: text rendered by an image model cannot be corrected
+      without regenerating the whole asset, so typos become permanent; brand
+      consistency stops depending on the model's whim; and one generated scene
+      exports to 1:1, 4:5 and 9:16 without generating anything twice.
+      Re-encoding here also strips the generator's C2PA and IPTC provenance
+      metadata, since the output is a genuinely new composite. That is a side
+      effect and not a guarantee: platform-side classifiers and invisible
+      watermarks are unaffected and may still label the post.
+
+  - id: social-publish
+    slot: Scheduling and publishing
+    required_by: [social-publisher]
+    on_absent: degrade
+    alternatives:
+      - name: Postiz MCP
+        note: Reference implementation. Self-hostable, multi-platform.
+      - name: Any scheduler with a write API
+      - name: Platform-native APIs
+        note: Bind per platform. More setup, no middleman.
+    manual_fallback: >
+      The card carries the finished asset, the caption exactly as it should
+      publish, the hashtag block, the alt text, and the target platform and time.
+      Copy, paste, attach, post. Under a minute per item.
+
+  - id: social-listen
+    slot: Listening and trend discovery
+    required_by: [social-listener, social-engagement]
+    on_absent: degrade
+    alternatives:
+      - name: Public JSON endpoints
+        auth: none
+        note: >
+          Several large platforms expose read-only JSON with no key. Coverage is
+          runtime-dependent: some platforms block generic fetchers, and some
+          runtimes refuse those hosts. Agents name what they could not sweep.
+      - name: WebSearch and WebFetch
+        auth: none
+      - name: Browser automation
+        note: Reaches surfaces that have no read API. Host-only, needs an interactive session.
+      - name: A social listening platform API
+
+  - id: product-analytics
+    slot: Product analytics
+    required_by: [social-performance]
+    on_absent: degrade
+    alternatives:
+      - name: PostHog MCP
+        note: Reference implementation.
+      - name: Any product-analytics API
+      - name: Platform-native insights only
+        note: Loses the link between a post and what the visitor did next.
+
+  - id: platform-analytics
+    slot: Per-platform post metrics
+    required_by: [social-performance]
+    on_absent: degrade
+    alternatives:
+      - name: Platform-native analytics APIs
+      - name: Scheduler-reported metrics
+        note: Most schedulers report reach and engagement back.
+      - name: Manual entry
+        note: The performance agent reads whatever numbers are in the ledger and works from those.
+
+# ---------------------------------------------------------------------------
+# Templates.
+#
+# These are SEEDS, not a menu. `binding/VISUAL-SYSTEMS.md` is what social-visual
+# actually reads; these are copied into it at install time so a new operator has
+# something working on day one. Edit them, delete them, or replace the whole file.
+# `/add-template` writes a new one from a reference image or a description.
+# ---------------------------------------------------------------------------
+
+templates:
+  - id: cinematic-poster
+    formats: [1:1, 4:5, 9:16]
+    scene: >
+      Single dramatic subject, dark ground, hard rim light in the accent colour,
+      shallow depth. Supporting objects arranged low in frame.
+    composite: Headline in heavy condensed caps, one word in the accent colour. Logo top centre.
+
+  - id: character
+    formats: [1:1, 4:5, 9:16]
+    scene: >
+      The operator's mascot or character, posed to the emotional beat of the
+      message, on a flat or gradient ground.
+    composite: Headline above, footer lockup below.
+    note: Needs a character reference in binding/. Skipped when absent.
+
+  - id: template-carousel
+    formats: [4:5]
+    slides: 4-8
+    scene: none
+    composite: >
+      Fully composited, no generation needed at all. Dark cover slide, light
+      interior slides, slide counter top-left, bullets left, character or mark
+      right, footer bar with domain.
+    note: Runs with zero image-gen capability. The pack's day-one default.
+
+  - id: editorial-cartoon
+    formats: [1:1]
+    scene: >
+      Monochrome etched line illustration, single visual metaphor, small figures,
+      caption baked below the frame.
+    composite: Series number and mark only.
+
+  - id: photographic-metaphor
+    formats: [1:1, 4:5]
+    scene: >
+      One photographic scene carrying the metaphor literally, with a single
+      accent-coloured element as the visual hook.
+    composite: Headline block on the negative space, benefit row and CTA bar optional.
+
+# ---------------------------------------------------------------------------
+
+guardrails:
+  # Read from binding/GUARDRAILS.md at run time. These are defaults, not limits.
+  posts_per_platform_per_day: 3
+  require_human_send_on:
+    - community surfaces where automation is not welcome
+  note: >
+    Ceilings here exist to protect account standing and are set by the operator.
+    The framework ships no opinion about subject matter, imagery or style.
+
+# ---------------------------------------------------------------------------
+# Placement: the visual-to-publish chain is HOST-SIDE, unbroken.
+#
+# Why, learned the hard way: a cloud clone cannot reach the host's disk. The
+# generated scene downloads to the host, the compositor runs on the host, the
+# approved card sits in the host's queue, and the scheduler upload needs the
+# local file. Split any link of visual -> gate -> publisher across machines and
+# the loop breaks with a file one runner can see and the other cannot.
+#
+# Format rule, same lesson: the compositor's output is ALWAYS png (or jpeg).
+# Generators return webp/avif at whim and schedulers reject them at whim; sharp
+# reads whatever arrives, png is what leaves. No asset reaches the publisher in
+# a format the scheduler might refuse.
+#
+# Cloud keeps the text-only stages, which produce and consume git-visible files.
+# ---------------------------------------------------------------------------
+
+schedule:
+  social-listener:    { cadence: daily,  time: "07:00", placement: cloud }
+  social-drafter:     { cadence: daily,  time: "07:30", placement: cloud }
+  social-visual:      { cadence: daily,  time: "08:00", placement: host  }
+  social-publisher:   { cadence: daily,  time: "09:00", placement: host  }   # same machine as visual + queue, always
+  social-engagement:  { cadence: twice,  time: "10:00,17:00", placement: cloud }
+  social-performance: { cadence: weekly, day: monday, time: "07:00", placement: cloud }

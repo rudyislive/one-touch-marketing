@@ -1,0 +1,19 @@
+{
+  "name": "one-touch-marketing",
+  "version": "0.1.0",
+  "description": "Run a marketing org on a fleet of small scoped AI agents, with one human approval gate in the middle.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "doctor": "node tools/doctor.mjs",
+    "compose": "node tools/compose.mjs",
+    "test": "node --test test/",
+    "test:smoke": "node --test test/smoke.test.mjs",
+    "test:degraded": "node --test test/degraded.test.mjs",
+    "test:binding": "node --test test/binding.test.mjs"
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
+  }
+}

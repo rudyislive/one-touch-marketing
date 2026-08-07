@@ -1,0 +1,9 @@
+node_modules/
+build/
+.env
+.env.*
+!.env.example
+_host/logs/
+_host/schedules.json
+_host/.bridge-seen.json
+.DS_Store
