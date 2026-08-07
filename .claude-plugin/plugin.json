@@ -1,0 +1,16 @@
+{
+  "name": "one-touch-marketing",
+  "description": "AI drafts everything. You approve once a day. Machines ship it. A fleet of small scoped agents for search, content and social marketing, behind one human gate.",
+  "version": "0.1.0",
+  "homepage": "https://github.com/rudyislive/one-touch-marketing",
+  "repository": "https://github.com/rudyislive/one-touch-marketing",
+  "license": "MIT",
+  "keywords": [
+    "marketing",
+    "automation",
+    "agents",
+    "social-media",
+    "seo",
+    "content"
+  ]
+}

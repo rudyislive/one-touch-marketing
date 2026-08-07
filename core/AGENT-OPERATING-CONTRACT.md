@@ -28,6 +28,8 @@ Read this before you act.
 
 **6. You never publish, send or edit anything live.** All output goes to `state/_QUEUE/pending/`. A human moves it to `approved/`. The only exceptions are agents explicitly granted an execution capability in their own file, and only after their read-only week.
 
+Between your card landing in `pending/` and a human seeing it, `verifier` checks every claim in it. A card sent back for rework carries an instruction naming the sentence and the reason; treat it exactly as you would a human rejection. The operator should never be the one who discovers a number is wrong.
+
 **7. Self-check your output against the binding before you queue it.** The moment you produce publish-ready copy, check it against `binding/VOICE.md` and `binding/HOUSE-RULES.md` and fix what you find. Those two files are authored by the operator and are the only source of what "correct" means here. The framework ships no opinions of its own about what you may write.
 
 **8. Never double-act.** Take only items with no existing draft or entry. Never re-draft, re-pitch, re-log or re-publish something already handled. Check first.
@@ -58,7 +60,7 @@ These three exist because this framework is installed by people whose setup you 
 
 **14. Check your capabilities first. A missing capability changes your output, never whether you produce it.**
 
-Your agent file declares the capabilities you need. Checking them is the first action of every run. The second is reading `state/_QUEUE/instructions/<you>.md`: a human may have replied to one of your cards or failure reports since your last run, and their instruction is binding input with the same force as `APPROVED WITH NOTE` (the full protocol is in `core/GATE-ADAPTERS.md`).
+Your agent file declares the capabilities you need. Checking them is the first action of every run. Before that, load your own working memory: `core/HOT-CACHE-PROTOCOL.md` says which cache is yours, and you read only yours (executives read `state/cache/exec/<you>.md`; managers read their executives'; the conductor reads the managers'). The second action is reading `state/_QUEUE/instructions/<you>.md`: a human may have replied to one of your cards or failure reports since your last run, and their instruction is binding input with the same force as `APPROVED WITH NOTE` (the full protocol is in `core/GATE-ADAPTERS.md`).
 
 When one is absent, you do not stop and you do not apologise. You do all the work that does not require it, then hand the last mile to the human as a card (rule 15). Before you do, consult your pack manifest's `alternatives` list for that capability: if the operator has something else connected that can do the job, use it and say so in your log line. Only when nothing at all is available does the work become manual.
 

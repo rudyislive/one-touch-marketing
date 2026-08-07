@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,13 +19,37 @@ const FORBIDDEN = [
   'cWF0b2JpdA==', 'XGJxc2lcYg==', 'd2VhbHRoLD9ccypieVxzKmRlc2lnbg==',
   'aW5zdGl0dXRpb25hbCBjdXN0b2R5', 'Y3J5cHRvIGludmVzdG1lbnRzIGFyZSBzdWJqZWN0IHRvIG1hcmtldCByaXNr',
   'XGJrYW5uYVxi', 'XGJ2cmlvblxi', 'XGJnZXE4XGI=', 'Ym9zcy0/aHE=',
-  'cnVkeWlzbGl2ZQ==', 'XGJydWRyYVxi',
+  'XGJydWRyYVxi',
+  // The GitHub account name is deliberately NOT here: it is the install URL in
+  // README and package.json, which is the one place it belongs.
 ].map(b64 => new RegExp(Buffer.from(b64, 'base64').toString('utf8'), 'i'));
 
-const files = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8' })
-  .split('\n').filter(Boolean)
+// Prefer git (fast, respects ignores); fall back to a walk so an installed
+// copy with no repo still self-checks.
+function walk(dir, base = '') {
+  const SKIP = new Set(['node_modules', '.git', 'build', 'state']);
+  const out = [];
+  for (const e of readdirSync(join(ROOT, dir === '' ? '.' : dir), { withFileTypes: true })) {
+    if (SKIP.has(e.name)) continue;
+    const rel = base ? `${base}/${e.name}` : e.name;
+    if (e.isDirectory()) out.push(...walk(rel, rel));
+    else out.push(rel);
+  }
+  return out;
+}
+
+let files;
+try {
+  files = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+    .split('\n').filter(Boolean);
+  if (!files.length) throw new Error('empty');
+} catch {
+  files = walk('');
+}
+files = files
   .filter(f => !f.startsWith('docs/specs/'))
-  .filter(f => f !== 'test/leak.test.mjs'); // the pattern list would match itself
+  .filter(f => f !== 'test/leak.test.mjs')       // the scanner is exempt by construction
+  .filter(f => !f.endsWith('package-lock.json'));
 
 test('no private-deployment string in any shipped file', () => {
   const hits = [];

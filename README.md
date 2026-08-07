@@ -32,12 +32,25 @@ Clone it, run `/onboard`, connect nothing. The fleet still runs: it plans, draft
 
 `node tools/doctor.mjs` tells you at any moment what is connected, what is running on a substitute, and what is in handoff mode.
 
-## Getting started
+## Install, one line
 
-1. Clone the repo, `npm install`
-2. Open it in your agent runtime (Claude Code is the tested reference; a plain-prose contract for other runtimes is in `runtimes/`)
-3. Say `/onboard` and answer the questions
-4. Approve your first card
+**In Claude Code** (recommended):
+
+```
+/plugin marketplace add rudyislive/one-touch-marketing
+```
+
+then `/plugin install one-touch-marketing`, and say `/onboard`.
+
+**Anywhere else:**
+
+```
+npx github:rudyislive/one-touch-marketing init
+```
+
+That copies the framework in, installs dependencies, prints what you have connected, and stops. Then open the folder in your agent runtime and say `/onboard`.
+
+Onboarding is a conversation, not a config file: what you are building, what you want out in the world, how you sound, which lanes and platforms you want. It discovers your tools itself and ends by putting a real draft in front of you. Nothing needs to be connected first.
 
 The onboarding is an interview, not a config file. It asks what you are building, what you want out in the world, how you sound and who approves; it discovers your tools itself; and it ends by producing your first real draft, so you see the whole loop close in your first session.
 

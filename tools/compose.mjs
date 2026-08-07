@@ -207,7 +207,22 @@ async function renderFormat(spec, format, outDir) {
   // ---- base: generated scene, or a flat/gradient ground when there is none.
   let base;
   if (spec.scene && existsSync(spec.scene)) {
-    base = sharp(spec.scene).resize(W, H, { fit: 'cover', position: 'attention' });
+    let src = sharp(spec.scene);
+    // Optional margin trim before anything else. Ordinary composition work:
+    // generated sources often carry a corner mark, and every template's own
+    // footer lockup occupies that space anyway.
+    if (spec.crop) {
+      const meta = await src.metadata();
+      const c = typeof spec.crop === 'number'
+        ? { top: spec.crop, bottom: spec.crop, left: spec.crop, right: spec.crop }
+        : { top: 0, bottom: 0, left: 0, right: 0, ...spec.crop };
+      src = sharp(await src.extract({
+        left: c.left, top: c.top,
+        width: Math.max(1, meta.width - c.left - c.right),
+        height: Math.max(1, meta.height - c.top - c.bottom),
+      }).toBuffer());
+    }
+    base = src.resize(W, H, { fit: 'cover', position: 'attention' });
   } else {
     base = sharp({
       create: { width: W, height: H, channels: 4,

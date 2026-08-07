@@ -17,8 +17,19 @@ const agents = AGENT_DIRS.flatMap(d =>
     .map(f => ({ file: join(d, f), name: f.replace('.md', ''),
                  text: readFileSync(join(ROOT, d, f), 'utf8') })));
 
-test('fleet is complete: 18 agents', () => {
-  assert.equal(agents.length, 18, agents.map(a => a.name).join(', '));
+test('fleet is complete: 22 agents across three tiers', () => {
+  assert.equal(agents.length, 22, agents.map(a => a.name).join(', '));
+  for (const required of ['conductor', 'content-manager', 'social-manager',
+                          'health-manager', 'verifier'])
+    assert.ok(agents.some(a => a.name === required), `missing ${required}`);
+});
+
+test('every manager reads the cache protocol and escalates rather than produces', () => {
+  for (const m of agents.filter(a => a.name.endsWith('-manager'))) {
+    assert.ok(m.text.includes('HOT-CACHE-PROTOCOL.md'), `${m.file}: no cache protocol`);
+    assert.ok(/state\/cache\/mgr\//.test(m.text), `${m.file}: never writes a manager cache`);
+    assert.ok(/state\/cache\/exec\//.test(m.text), `${m.file}: never reads its executives`);
+  }
 });
 
 test('every agent has complete frontmatter', () => {
@@ -100,7 +111,7 @@ test('compositor renders all three formats from one spec, no scene needed', () =
 test('skills all exist with frontmatter descriptions', () => {
   const skills = ['onboard', 'doctor', 'review-queue', 'add-pack', 'add-template', 'status'];
   for (const s of skills) {
-    const p = join(ROOT, 'core', 'skills', s, 'SKILL.md');
+    const p = join(ROOT, 'skills', s, 'SKILL.md');
     assert.ok(existsSync(p), `missing skill ${s}`);
     assert.ok(readFileSync(p, 'utf8').includes('description:'), `${s}: no description`);
   }

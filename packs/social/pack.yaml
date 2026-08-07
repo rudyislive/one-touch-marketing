@@ -55,12 +55,26 @@ capabilities:
     on_absent: degrade
     alternatives:
       - name: Higgsfield MCP
-        note: Reference implementation. Strongest for cinematic and 3D-character work.
+        note: >
+          Paid, fastest, strongest for cinematic and 3D-character work. One API
+          call per scene, fully unattended.
       - name: Any image-generation HTTP API
         note: Bind the endpoint in binding/TOOLS.md. Quality varies, pipeline is identical.
+      - name: Browser generation via Claude in Chrome
+        auth: none
+        cost: free
+        note: >
+          The free path, and a real one. Drives the operator's own signed-in
+          Gemini or ChatGPT tab, pastes the same scene prompt the paid path
+          would use, downloads the result to this machine, and hands it to the
+          compositor unchanged. Slower and host-only (it needs a real browser
+          and a logged-in session), and it runs on the operator's own free
+          allowance rather than credits. Requires the Chrome extension; see
+          packs/social/reference/BROWSER-GENERATION.md for the full flow.
       - name: Local diffusion runtime
         auth: none
-        note: Slower, free, fully offline.
+        cost: free
+        note: Fully offline. Slowest, uses local compute, no account needed.
     manual_fallback: >
       The card carries the complete scene prompt, the aspect ratio, and the
       composite spec. Generate it anywhere you like, drop the file next to the

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "one-touch-marketing",
+  "description": "One-touch marketing: a fleet of small scoped marketing agents behind a single human approval gate.",
+  "owner": {
+    "name": "one-touch-marketing"
+  },
+  "plugins": [
+    {
+      "name": "one-touch-marketing",
+      "description": "AI drafts everything. You approve once a day. Machines ship it. 18 scoped agents for search, content and social marketing, under a 16-rule operating contract, with graceful degradation when nothing is connected.",
+      "category": "productivity",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/rudyislive/one-touch-marketing.git"
+      },
+      "homepage": "https://github.com/rudyislive/one-touch-marketing"
+    }
+  ]
+}

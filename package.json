@@ -5,6 +5,10 @@
   "license": "MIT",
   "type": "module",
   "engines": { "node": ">=18" },
+  "bin": { "one-touch-marketing": "bin/otm.mjs", "otm": "bin/otm.mjs" },
+  "repository": { "type": "git", "url": "git+https://github.com/rudyislive/one-touch-marketing.git" },
+  "homepage": "https://github.com/rudyislive/one-touch-marketing",
+  "keywords": ["marketing", "automation", "agents", "social-media", "seo", "claude-code"],
   "scripts": {
     "doctor": "node tools/doctor.mjs",
     "compose": "node tools/compose.mjs",

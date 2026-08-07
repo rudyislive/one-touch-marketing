@@ -8,6 +8,10 @@
 | agent              | enabled | schedule override |
 |--------------------|---------|-------------------|
 | conductor          | yes     |                   |
+| content-manager    | yes     |                   |
+| social-manager     | yes     |                   |
+| health-manager     | yes     |                   |
+| verifier           | yes     |                   |
 | reconciliation     | yes     |                   |
 | monthly-audit      | yes     |                   |
 | content-drafter    | UNKNOWN |                   |
