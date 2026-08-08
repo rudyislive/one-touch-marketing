@@ -62,6 +62,23 @@ if (!OFF) for (const f of stateFiles) {
   if (!existsSync(p)) writeFileSync(p, `# ${f}\n\n<!-- scaffolded by install-pack; agents append, humans read -->\n`);
 }
 
+// 2b. template seeds -> binding/VISUAL-SYSTEMS.md, only while its Systems
+// section is still UNKNOWN. Found the hard way: without this, the drafter
+// works but the visual agent stalls on an empty template registry.
+if (!OFF) {
+  const tmplBlock = text.match(/\ntemplates:\n([\s\S]*?)(?=\n# -|\n\w|$)/);
+  const vsPath = join(ROOT, 'binding', 'VISUAL-SYSTEMS.md');
+  if (tmplBlock && existsSync(vsPath)) {
+    const vs = readFileSync(vsPath, 'utf8');
+    if (/## Systems[\s\S]*UNKNOWN/.test(vs)) {
+      const seeded = vs.replace(/(## Systems[\s\S]*?)UNKNOWN/,
+        `$1<!-- seeded from packs/${name}/pack.yaml by install-pack; edit freely -->\n\`\`\`yaml\n${tmplBlock[1].trim()}\n\`\`\`\n`);
+      writeFileSync(vsPath, seeded);
+      console.log('seeded binding/VISUAL-SYSTEMS.md with the pack templates.');
+    }
+  }
+}
+
 // 3. schedules.json for the host runners
 const schedPath = join(ROOT, '_host', 'schedules.json');
 mkdirSync(join(ROOT, '_host'), { recursive: true });
