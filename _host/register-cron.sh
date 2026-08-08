@@ -13,7 +13,8 @@ for (const [agent, e] of Object.entries(s)) {
   for (const t of (e.time ?? "08:00").split(",")) {
     const [h, m] = t.split(":");
     let spec;
-    if (e.cadence === "weekly")       spec = `${m} ${h} * * ${dow[(e.day??"monday").toLowerCase()] ?? 1}`;
+    if (e.cadence === "hourly")       spec = `0 * * * *`;
+    else if (e.cadence === "weekly")  spec = `${m} ${h} * * ${dow[(e.day??"monday").toLowerCase()] ?? 1}`;
     else if (e.cadence === "monthly") spec = `${m} ${h} ${e.day ?? 1} * *`;
     else                              spec = `${m} ${h} * * *`;
     console.log(`${spec} cd $(pwd)/.. && _host/run-agent.sh ${agent}`);

@@ -15,7 +15,8 @@
     "test": "node --test test/",
     "test:smoke": "node --test test/smoke.test.mjs",
     "test:degraded": "node --test test/degraded.test.mjs",
-    "test:binding": "node --test test/binding.test.mjs"
+    "test:hardening": "node --test test/hardening.test.mjs",
+    "test:leak": "node --test test/leak.test.mjs"
   },
   "dependencies": {
     "sharp": "^0.33.5"

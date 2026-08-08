@@ -12,6 +12,7 @@
 ## The gate
 - rework_cycles_per_item_per_day: 5    # a reject->redraft loop that will not converge parks the item
 - pending_cards_alert_age_days: 5      # older than this is surfaced weekly as a silted decision
+- max_concurrent_agents: 3             # machine-enforced ceiling on simultaneous model runs the bridge will spawn
 
 ## Attention (yours)
 - max_bridge_pings_per_day: 10         # beyond this the bridge batches into a digest; you asked for one touch, not fifty

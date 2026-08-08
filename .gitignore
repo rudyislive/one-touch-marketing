@@ -6,4 +6,8 @@ build/
 _host/logs/
 _host/schedules.json
 _host/.bridge-seen.json
+state/.locks/
+state/.claims/
+state/.counters/
+state/.running/
 .DS_Store

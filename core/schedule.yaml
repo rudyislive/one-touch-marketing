@@ -1,0 +1,19 @@
+# Core schedule - the orchestration and safety tier.
+#
+# These agents belong to no pack, so the installer registers them unconditionally
+# (they were, in an earlier version, never scheduled at all, which meant the
+# verifier and conductor never fired on their own). Placement follows each
+# agent's frontmatter; managers and verifier run often because the pipeline
+# depends on them, reconciliation daily, the audit monthly.
+#
+# verifier runs frequently and host-side: it must check content cards before the
+# bridge shows them, so it sits right behind production on the same machine.
+
+schedule:
+  verifier:         { cadence: hourly,  placement: host }
+  conductor:        { cadence: weekly,  day: monday, time: "07:15", placement: host }
+  content-manager:  { cadence: daily,   time: "10:00", placement: cloud }
+  social-manager:   { cadence: daily,   time: "10:05", placement: host }
+  health-manager:   { cadence: weekly,  day: monday, time: "06:45", placement: cloud }
+  reconciliation:   { cadence: daily,   time: "09:40", placement: cloud }
+  monthly-audit:    { cadence: monthly, day: 1, time: "10:07", placement: host }

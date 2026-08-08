@@ -29,7 +29,8 @@
 
 import sharp from 'sharp';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
-import { join, extname, basename } from 'node:path';
+import { join, extname, basename, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ---------------------------------------------------------------------------
 // Formats
@@ -115,17 +116,36 @@ function paragraphSvg({ text, x, y, fontSize, lineHeight, font, weight, colour,
 // as base64 so the render is identical everywhere.
 // ---------------------------------------------------------------------------
 
-function fontFaces(fonts = {}) {
-  return Object.entries(fonts).map(([family, def]) => {
+const HERE = dirname(fileURLToPath(import.meta.url));
+const BUNDLED = join(HERE, '..', 'assets', 'fonts');
+
+function faceFor(family, file, weight) {
+  if (!file || !existsSync(file)) return '';
+  const ext = extname(file).toLowerCase();
+  const mime = ext === '.otf' ? 'font/otf' : ext === '.ttf' ? 'font/ttf' : 'font/woff2';
+  const b64 = readFileSync(file).toString('base64');
+  return `@font-face{font-family:'${family}';font-weight:${weight};`
+       + `src:url(data:${mime};base64,${b64});}`;
+}
+
+function fontFaces(fonts = {}, families = []) {
+  const faces = [];
+  // 1. explicit brand font files from the binding
+  for (const [family, def] of Object.entries(fonts)) {
     const file = typeof def === 'string' ? def : def.file;
-    if (!file || !existsSync(file)) return '';
-    const mime = extname(file).toLowerCase() === '.otf' ? 'font/otf'
-               : extname(file).toLowerCase() === '.ttf' ? 'font/ttf' : 'font/woff2';
-    const b64 = readFileSync(file).toString('base64');
-    const weight = typeof def === 'object' && def.weight ? def.weight : 'normal';
-    return `@font-face{font-family:'${family}';font-weight:${weight};`
-         + `src:url(data:${mime};base64,${b64});}`;
-  }).join('\n');
+    faces.push(faceFor(family, file, (typeof def === 'object' && def.weight) ? def.weight : 'normal'));
+  }
+  // 2. bundled Inter, embedded for any family the spec USES but did not supply a
+  // file for. This is the fix for blank banners on a host with no system font:
+  // the type layer always has a real, embedded face to render, everywhere.
+  const supplied = new Set(Object.keys(fonts));
+  for (const fam of new Set(families)) {
+    if (supplied.has(fam)) continue;
+    faces.push(faceFor(fam, join(BUNDLED, 'Inter-Regular.woff2'), 400));
+    faces.push(faceFor(fam, join(BUNDLED, 'Inter-Bold.woff2'), 700));
+    faces.push(faceFor(fam, join(BUNDLED, 'Inter-Bold.woff2'), 800));
+  }
+  return faces.filter(Boolean).join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +298,7 @@ async function renderFormat(spec, format, outDir) {
   layers.push(footerSvg(spec.footer, W, H, spec));
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
-    <style>${fontFaces(spec.fontFiles)}</style>
+    <style>${fontFaces(spec.fontFiles, [hf.family, bf.family])}</style>
     ${layers.filter(Boolean).join('\n')}
   </svg>`;
 

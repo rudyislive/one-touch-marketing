@@ -22,10 +22,11 @@
  */
 
 import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync,
-         readdirSync, renameSync, statSync, createReadStream } from 'node:fs';
-import { join, dirname, basename } from 'node:path';
+         readdirSync, renameSync, unlinkSync, statSync } from 'node:fs';
+import { join, dirname, basename, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
+import { atomicWrite, runActive } from '../tools/lib/safe-fs.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const Q = (p) => join(ROOT, 'state', '_QUEUE', p);
@@ -42,16 +43,19 @@ const API = `https://api.telegram.org/bot${TOKEN}`;
 
 function readConfig() {
   const cfg = { chat_id: '', on_approve: 'scheduled',
-                max_pings: 10, quiet: null, rework_cap: 5 };
+                max_pings: 10, quiet: null, rework_cap: 5, max_concurrent: 3 };
   try {
     const tools = readFileSync(join(ROOT, 'binding', 'TOOLS.md'), 'utf8');
     cfg.chat_id   = tools.match(/chat_id:\s*(\S+)/)?.[1] ?? '';
     cfg.on_approve = tools.match(/on_approve:\s*(\S+)/)?.[1] ?? 'scheduled';
   } catch {}
+  // env beats file, so the chat id can stay out of version control entirely
+  cfg.chat_id = process.env.TELEGRAM_CHAT_ID ?? cfg.chat_id;
   try {
     const g = readFileSync(join(ROOT, 'binding', 'GUARDRAILS.md'), 'utf8');
     cfg.max_pings  = Number(g.match(/max_bridge_pings_per_day:\s*(\d+)/)?.[1] ?? 10);
     cfg.rework_cap = Number(g.match(/rework_cycles_per_item_per_day:\s*(\d+)/)?.[1] ?? 5);
+    cfg.max_concurrent = Number(g.match(/max_concurrent_agents:\s*(\d+)/)?.[1] ?? 3);
     const q = g.match(/quiet_hours:\s*"?(\d{2}:\d{2})-(\d{2}:\d{2})"?/);
     if (q) cfg.quiet = [q[1], q[2]];
   } catch {}
@@ -67,7 +71,19 @@ function loadSeen() {
   catch { return { sent: {}, route: {}, offset: 0, pings: {}, rework: {}, digest: [] }; }
 }
 const state = loadSeen();
-const saveSeen = () => writeFileSync(SEEN, JSON.stringify(state, null, 2));
+const saveSeen = () => {
+  // prune before every save so the seen-file cannot grow without bound:
+  // day-keyed counters older than 7 days, sent-markers whose card left
+  // pending, and all but the newest 200 message routes.
+  const cutoff = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+  for (const k of Object.keys(state.pings))  if (k < cutoff) delete state.pings[k];
+  for (const k of Object.keys(state.rework)) if (k.slice(-10) < cutoff) delete state.rework[k];
+  for (const k of Object.keys(state.sent))
+    if (!existsSync(Q(join('pending', k))) && !existsSync(join(REPORTS, k))) delete state.sent[k];
+  const routes = Object.keys(state.route);
+  for (const k of routes.slice(0, Math.max(0, routes.length - 200))) delete state.route[k];
+  writeFileSync(SEEN, JSON.stringify(state, null, 2));
+};
 
 const today = () => new Date().toISOString().slice(0, 10);
 const stamp = () => new Date().toISOString().replace('T', ' ').slice(0, 16);
@@ -115,12 +131,17 @@ function summaryOf(text) {
 }
 
 function assetsOf(text, cardDir) {
-  // image paths referenced by the card, existing on this disk
+  // Image paths referenced by the card, existing on this disk.
+  // Security boundary: only files under state/ ever leave this machine. A card
+  // is model-written text; without this check a bad path in a card would ship
+  // an arbitrary readable file to the chat.
+  const STATE = resolve(ROOT, 'state');
   const out = [];
   for (const m of text.matchAll(/(?:^|\s)((?:[A-Za-z]:)?[\w./\\-]+\.(?:png|jpe?g))\b/g)) {
     const p = m[1];
-    for (const candidate of [p, join(ROOT, p), join(cardDir, p)]) {
-      if (existsSync(candidate)) { out.push(candidate); break; }
+    for (const candidate of [join(ROOT, p), join(cardDir, p), p]) {
+      const abs = resolve(candidate);
+      if (abs.startsWith(STATE + sep) && existsSync(abs)) { out.push(abs); break; }
     }
   }
   return [...new Set(out)].slice(0, 4);
@@ -129,9 +150,20 @@ function assetsOf(text, cardDir) {
 async function pushCard(cfg, file) {
   const text = readFileSync(file, 'utf8');
   const summary = summaryOf(text);
+  const key = basename(file);
+
+  // Verification gate: a content card must carry the verifier's VERIFIED block
+  // before it goes for approval, so the operator never decides on an unchecked
+  // claim. Cards that are not content (manual-post steps, indexing/aeo fill-in
+  // tables, re-plans, audits) are exempt by prefix. An unverified content card
+  // is still shown, but bannered, so nothing silts if the verifier is off.
+  const needsVerify = /^(social|blog|copyedit|faqsync|visual)-/i.test(key);
+  const verified = /^VERIFIED:/m.test(text) || / VERIFIED:/m.test(text);
+  const banner = (needsVerify && !verified)
+    ? '⚠ UNVERIFIED (verifier has not checked this yet)\n\n' : '';
+
   const body = text.length > 3500 ? text.slice(0, 3500) + '\n[...full card in queue]' : text;
   const assets = assetsOf(text, dirname(file));
-  const key = basename(file);
 
   const kb = { inline_keyboard: [[
     { text: 'Approve', callback_data: `ok:${key}` },
@@ -146,7 +178,7 @@ async function pushCard(cfg, file) {
 
   for (const a of assets) await tg('sendPhoto', { chat_id: cfg.chat_id, disable_notification: silent }, a);
   const sent = await tg('sendMessage', {
-    chat_id: cfg.chat_id, text: `${summary}\n\n${body}`.slice(0, 4000),
+    chat_id: cfg.chat_id, text: `${banner}${summary}\n\n${body}`.slice(0, 4000),
     reply_markup: kb, disable_notification: silent,
   });
 
@@ -167,26 +199,52 @@ async function pushReport(cfg, file) {
   state.sent[key] = true; saveSeen();
 }
 
-function scanOutbound(cfg) {
-  const jobs = [];
-  for (const f of readdirSync(Q('pending')).filter(f => f.endsWith('.md') && f !== 'README.md'))
-    if (!state.sent[f]) jobs.push(pushCard(cfg, Q(join('pending', f))));
+async function scanOutbound(cfg) {
+  // SEQUENTIAL on purpose. The ping budget and quiet-hours guard read and write
+  // a shared per-day counter; a concurrent Promise.all lets every send read the
+  // same pre-increment value and the ceiling never trips. One card at a time
+  // also keeps the chat order sane and is plenty fast at real queue sizes.
+  for (const f of readdirSync(Q('pending')).filter(f => f.endsWith('.md') && f !== 'README.md')) {
+    if (state.sent[f]) continue;
+    // settle guard: an agent may still be writing this card; a half card on a
+    // phone is a decision made on missing information. Next scan gets it.
+    if (Date.now() - statSync(Q(join('pending', f))).mtimeMs < 3000) continue;
+    await pushCard(cfg, Q(join('pending', f)));
+  }
   if (existsSync(REPORTS))
     for (const f of readdirSync(REPORTS).filter(f => /^(BLOCKED|ALERT)-.*\.md$/.test(f)))
-      if (!state.sent[f]) jobs.push(pushReport(cfg, join(REPORTS, f)));
-  return Promise.all(jobs);
+      if (!state.sent[f]) await pushReport(cfg, join(REPORTS, f));
 }
 
 // ---------------------------------------------------------------------------
 // Inbound: taps and replies -> file moves, instructions, re-runs
 // ---------------------------------------------------------------------------
 
-function agentOf(cardName) {
-  // cards are named <kind>-... ; kind maps to the owning agent via a prefix table
+function agentOf(cardName, cardText) {
+  // Authoritative source: an `owner:` line the agent wrote into the card
+  // (contract requires it). The filename prefix table is only a fallback for
+  // hand-made or legacy cards, because a slug-named file has no reliable prefix.
+  const owned = cardText && cardText.match(/^owner:\s*([\w-]+)\s*$/m)?.[1];
+  if (owned) return owned;
   const p = cardName.split(/[-.]/)[0].toLowerCase();
-  const map = { social: 'social-drafter', links: 'link-applier', replan: 'conductor',
-                blocked: cardName.match(/^BLOCKED-([\w-]+)-/i)?.[1] };
+  const map = { social: 'social-drafter', visual: 'social-visual', links: 'link-applier',
+                blog: 'content-drafter', copyedit: 'copy-editor', faqsync: 'faq-syncer',
+                replan: 'conductor', audit: 'monthly-audit', aeo: 'aeo-trend',
+                indexing: 'indexing-checker', manual: 'social-publisher',
+                blocked: cardName.match(/^BLOCKED-([\w-]+)-\d{4}/i)?.[1] };
   return map[p] ?? cardName.match(/^[A-Z]+-([\w-]+)-\d{4}/)?.[1] ?? null;
+}
+
+/**
+ * What fires immediately after an approval, when on_approve is trigger-next.
+ * Keyed by card kind: approving copy sends the item to the visual stage,
+ * approving visuals sends it to the publisher, approving a re-plan lets the
+ * conductor apply it. Kinds with no downstream simply wait for the schedule.
+ */
+function downstreamOf(cardName) {
+  const p = cardName.split(/[-.]/)[0].toLowerCase();
+  return { social: 'social-visual', visual: 'social-publisher',
+           replan: 'conductor', links: 'link-applier' }[p] ?? null;
 }
 
 function instruct(agent, text, re) {
@@ -195,20 +253,56 @@ function instruct(agent, text, re) {
     `\n## ${stamp()}\nINSTRUCT: ${text}\n(re: ${re})\n`);
 }
 
-function relaunch(agent, cfg) {
-  const item = `${agent}:${today()}`;
+async function relaunch(agent, cfg, itemKey) {
+  // Rework cap is PER ITEM per day (a looping card cannot exhaust the whole
+  // agent's budget, and five unrelated rejections do not park a sixth).
+  const item = `${itemKey ?? agent}:${today()}`;
   const n = state.rework[item] ?? 0;
   if (n >= cfg.rework_cap) {
     return tg('sendMessage', { chat_id: cfg.chat_id,
-      text: `Rework cap (${cfg.rework_cap}/day) hit for ${agent}; item parked. Raise the cap in binding/GUARDRAILS.md or handle at the desk.` });
+      text: `Rework cap (${cfg.rework_cap}/day) hit for this item; parked. Raise it in binding/GUARDRAILS.md or handle at the desk.` });
   }
+
+  // Single-instance: never spawn a second run of an agent already running, and
+  // never exceed a global concurrency ceiling of live model sessions.
+  if (runActive(ROOT, agent)) {
+    return tg('sendMessage', { chat_id: cfg.chat_id,
+      text: `${agent} is already running; your instruction is queued and its next run applies it.` });
+  }
+  const live = countActive();
+  if (live >= cfg.max_concurrent) {
+    return tg('sendMessage', { chat_id: cfg.chat_id,
+      text: `${live} agents already running (ceiling ${cfg.max_concurrent}); ${agent} will run on its schedule instead.` });
+  }
+
   state.rework[item] = n + 1; saveSeen();
-  if (DRY) { console.log(`[dry] relaunch ${agent}`); return; }
+  if (DRY) { console.log(`[dry] relaunch ${agent} (item ${item})`); return; }
+
+  if (!runnerExists()) {
+    return tg('sendMessage', { chat_id: cfg.chat_id,
+      text: `Cannot re-run ${agent}: the agent CLI is not on PATH. Set OTM_RUNNER in .env or install it, then reply again.` });
+  }
   const cmd = process.platform === 'win32' ? 'cmd' : 'sh';
   const args = process.platform === 'win32'
     ? ['/c', join(ROOT, '_host', 'run-agent.cmd'), agent]
     : [join(ROOT, '_host', 'run-agent.sh'), agent];
   spawn(cmd, args, { cwd: ROOT, detached: true, stdio: 'ignore' }).unref();
+}
+
+function countActive() {
+  const dir = join(ROOT, 'state', '.running');
+  if (!existsSync(dir)) return 0;
+  return readdirSync(dir).filter(f => runActive(ROOT, f.replace(/\.pid$/, ''))).length;
+}
+
+let _runnerChecked;
+function runnerExists() {
+  if (_runnerChecked !== undefined) return _runnerChecked;
+  const runner = process.env.OTM_RUNNER || 'claude';
+  const probe = process.platform === 'win32' ? `where ${runner}` : `command -v ${runner}`;
+  try { execSync(probe, { stdio: 'ignore' }); _runnerChecked = true; }
+  catch { _runnerChecked = false; }
+  return _runnerChecked;
 }
 
 async function onCallback(cfg, cb) {
@@ -217,19 +311,27 @@ async function onCallback(cfg, cb) {
   if (!existsSync(from)) {
     return tg('answerCallbackQuery', { callback_query_id: cb.id, text: 'Card already handled.' });
   }
+  const text = readFileSync(from, 'utf8');
   if (verb === 'ok') {
-    renameSync(from, Q(join('approved', key)));
+    const dest = Q(join('approved', key));
+    if (existsSync(dest)) {   // collision guard: never silently overwrite approved work
+      await tg('answerCallbackQuery', { callback_query_id: cb.id,
+        text: 'A card with this name is already approved; not overwriting. Check the queue.' });
+      return;
+    }
+    renameSync(from, dest);
     await tg('answerCallbackQuery', { callback_query_id: cb.id, text: 'Approved.' });
-    if (cfg.on_approve === 'trigger-next') relaunch('social-publisher', cfg);
+    if (cfg.on_approve === 'trigger-next') {
+      const next = downstreamOf(key);
+      if (next) await relaunch(next, cfg, key);
+    }
   } else {
-    const text = readFileSync(from, 'utf8');
-    writeFileSync(Q(join('rejected', key)),
+    atomicWrite(Q(join('rejected', key)),
       `REJECTED: no reason given, self-critique required\n${text}`);
-    renameSync(from, Q(join('rejected', `.${key}.tmp`))); // ensure single file remains
-    try { renameSync(Q(join('rejected', `.${key}.tmp`)), Q(join('rejected', key))); } catch {}
+    unlinkSync(from);
     await tg('answerCallbackQuery', { callback_query_id: cb.id, text: 'Rejected. Reply with a line to guide the redo.' });
-    const agent = agentOf(key);
-    if (agent) relaunch(agent, cfg);
+    const agent = agentOf(key, text);
+    if (agent) await relaunch(agent, cfg, key);
   }
 }
 
@@ -241,17 +343,19 @@ async function onMessage(cfg, msg) {
   const repliedTo = msg.reply_to_message?.message_id;
   const key = repliedTo ? state.route[repliedTo] : null;
   if (key) {
-    const agent = agentOf(key) ?? 'conductor';
     const pending = Q(join('pending', key));
+    const cardText = existsSync(pending) ? readFileSync(pending, 'utf8')
+                   : existsSync(join(REPORTS, key)) ? readFileSync(join(REPORTS, key), 'utf8') : '';
+    const agent = agentOf(key, cardText) ?? 'conductor';
     if (existsSync(pending)) {
-      // note on a still-pending card: treat as approve-with-note? No: only words.
-      // The words become a binding instruction; buttons still decide the card.
+      // note on a still-pending card: the words become a binding instruction;
+      // buttons still decide the card.
       instruct(agent, text, key);
       return tg('sendMessage', { chat_id: cfg.chat_id, reply_to_message_id: msg.message_id,
         text: `Noted for ${agent}. Buttons on the card still decide it.` });
     }
     instruct(agent, text, key);
-    relaunch(agent, cfg);
+    await relaunch(agent, cfg, key);
     return tg('sendMessage', { chat_id: cfg.chat_id, reply_to_message_id: msg.message_id,
       text: `Instructed ${agent}; re-running now.` });
   }
@@ -260,7 +364,7 @@ async function onMessage(cfg, msg) {
   const at = text.match(/^@([\w-]+)\s+([\s\S]+)/);
   if (at) {
     instruct(at[1], at[2], 'direct message');
-    relaunch(at[1], cfg);
+    await relaunch(at[1], cfg, `direct:${at[1]}`);
     return tg('sendMessage', { chat_id: cfg.chat_id, text: `Instructed ${at[1]}; re-running now.` });
   }
 
@@ -295,7 +399,23 @@ if (!TOKEN && !DRY) { console.error('TELEGRAM_BOT_TOKEN missing (.env). Set TELE
 if (!cfg.chat_id && !DRY) { console.error('chat_id missing in binding/TOOLS.md gate adapter section.'); process.exit(1); }
 
 console.log(`[bridge] up. dry=${DRY} once=${ONCE} on_approve=${cfg.on_approve}`);
+if (!DRY && !runnerExists())
+  console.warn('[bridge] warning: agent runner not on PATH; rework re-runs will report that until it is installed or OTM_RUNNER is set.');
+
+// The whole cycle is guarded: a transient network error (getUpdates rejecting
+// on DNS/offline/5xx) must not kill the gate. It backs off and continues, so
+// the bridge self-heals instead of silently dying until the next reboot.
+let backoff = 1000;
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 do {
-  await scanOutbound(cfg);
-  await poll(cfg);
+  try {
+    await scanOutbound(cfg);
+    await poll(cfg);
+    backoff = 1000;                        // healthy cycle resets the backoff
+  } catch (e) {
+    if (ONCE) throw e;                      // tests want the failure surfaced
+    console.error(`[bridge] cycle error (${e.message}); retrying in ${backoff}ms`);
+    await sleep(backoff);
+    backoff = Math.min(backoff * 2, 60000); // cap at a minute
+  }
 } while (!ONCE);

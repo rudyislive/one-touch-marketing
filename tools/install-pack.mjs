@@ -35,14 +35,18 @@ const stateBlock = text.match(/\nstate:\n([\s\S]*?)\n\w/);
 const stateFiles = stateBlock ? [...stateBlock[1].matchAll(/^\s*- (.+)$/gm)].map(m => m[1].trim()) : [];
 
 // schedule: "  agent: { cadence: daily, time: "07:45", placement: host }"
-const schedule = {};
-const schedBlock = text.match(/\nschedule:\n([\s\S]*)$/);
-if (schedBlock) for (const m of schedBlock[1].matchAll(/^\s{2}([\w-]+):\s*\{([^}]*)\}/gm)) {
-  const entry = {};
-  for (const kv of m[2].matchAll(/(\w+):\s*(?:"([^"]*)"|([^,}]+))/g))
-    entry[kv[1]] = (kv[2] ?? kv[3]).trim();
-  schedule[m[1]] = entry;
+function parseSchedule(src) {
+  const out = {};
+  const block = src.match(/\nschedule:\n([\s\S]*)$/);
+  if (block) for (const m of block[1].matchAll(/^\s{2}([\w-]+):\s*\{([^}]*)\}/gm)) {
+    const entry = {};
+    for (const kv of m[2].matchAll(/(\w+):\s*(?:"([^"]*)"|([^,}]+))/g))
+      entry[kv[1]] = (kv[2] ?? kv[3]).trim();
+    out[m[1]] = entry;
+  }
+  return out;
 }
+const schedule = parseSchedule(text);
 
 // 1. FLEET.md rows
 const fleetPath = join(ROOT, 'binding', 'FLEET.md');
@@ -87,6 +91,13 @@ for (const [agent, entry] of Object.entries(schedule)) {
   if (OFF) delete all[agent];
   else all[agent] = { ...entry, pack: name };
 }
+// The core tier (verifier, conductor, managers, reconciliation, audit) belongs
+// to no pack, so it is registered unconditionally on every install. Without
+// this the safety and orchestration agents were never scheduled at all.
+const corePath = join(ROOT, 'core', 'schedule.yaml');
+if (existsSync(corePath))
+  for (const [agent, entry] of Object.entries(parseSchedule(readFileSync(corePath, 'utf8'))))
+    all[agent] = { ...entry, pack: 'core' };
 writeFileSync(schedPath, JSON.stringify(all, null, 2));
 
 console.log(`${OFF ? 'disabled' : 'installed'} ${name}: ${agents.length} agents, ${OFF ? 0 : stateFiles.length} state files, schedules updated.`);

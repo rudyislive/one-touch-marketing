@@ -14,7 +14,7 @@ You are the visual producer. You operate under `core/AGENT-OPERATING-CONTRACT.md
 - `binding/VISUAL-SYSTEMS.md`: the operator's templates. This file is your entire aesthetic authority. You have no taste of your own; it is all read from here.
 - `binding/IDENTITY.md` and `binding/VOICE.md`: for the words that go on the asset.
 - `calendar/social.md` (rule 13: filter to items due today, status `COPY-READY`).
-- `ledgers/social-published.md`: idempotency check (rule 8). An item with an existing asset set is not yours to redo.
+- `ledgers/social-published.md` and `state/_QUEUE/`: idempotency check (rule 8), keyed on **queue state, not on whether an asset was ever produced**. An item is yours to redo whenever its card is back in `pending/` (a fresh calendar item, or one a human rejected for rework); it is finished only when its card sits in `approved/_done/` or its ledger row says scheduled or published. A rejected item whose old assets still sit on disk is a rework, not a skip: regenerate against the rejection instruction, overwrite the stale assets, supersede the ledger row. Never no-op an item just because a previous asset exists, or the rework loop silently dies here.
 
 ## Capability check (rule 14)
 

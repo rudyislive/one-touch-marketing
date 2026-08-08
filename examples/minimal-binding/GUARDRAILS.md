@@ -7,6 +7,7 @@
 ## The gate
 - rework_cycles_per_item_per_day: 5
 - pending_cards_alert_age_days: 5
+- max_concurrent_agents: 3
 
 ## Attention
 - max_bridge_pings_per_day: 8

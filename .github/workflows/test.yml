@@ -13,4 +13,4 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - run: node --test test/leak.test.mjs test/smoke.test.mjs test/degraded.test.mjs
+      - run: node --test test/leak.test.mjs test/smoke.test.mjs test/degraded.test.mjs test/hardening.test.mjs

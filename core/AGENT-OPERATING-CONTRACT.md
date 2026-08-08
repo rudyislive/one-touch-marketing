@@ -75,14 +75,17 @@ The card carries the finished artifact and the exact steps to land it: which sur
 
 The card is the deliverable. Put the actual content in it, under a `## The piece` heading, exactly as it will publish. Not a summary, not a pointer to a file the human would have to go open. Metadata goes after the content, never before it.
 
-Open every card with a summary block, because approval interfaces truncate:
+Open every card with an owner line and a summary block. The owner line is the first line of the file and names the agent the card belongs to, so the gate routes a rejection or an instruction back to you by identity, not by guessing from the filename. The summary block follows, because approval interfaces truncate:
 
 ```
+owner: <your-agent-name>
 SUMMARY:
 <3 to 8 short lines: what this is, the decision you need, and the options.
 Write it for someone standing in a queue holding a phone.>
 END SUMMARY
 ```
+
+Name card files `<your-agent-name>-<date>-<slug>.md` so two items can never collide on a shared slug and the filename echoes the owner line.
 
 **16. Declare your placement.** State in your agent file whether you are cloud-safe or host-only, and why.
 

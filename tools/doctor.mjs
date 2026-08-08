@@ -131,10 +131,24 @@ const hasEnv = (...keys) => keys.some(k => (process.env[k] ?? '').trim().length 
  * Mechanical probes, keyed by the alternative's name in the manifest.
  * Anything absent from this table is agent-observable, not script-observable.
  */
+const canImportPIL = () => {
+  for (const py of ['python', 'python3', 'py']) {
+    if (!hasBinary(py)) continue;
+    try { execSync(`${py} -c "import PIL"`, { stdio: 'ignore' }); return true; } catch {}
+  }
+  return false;
+};
+const sharpLoads = () => {
+  // presence of the folder is not enough: a failed native build leaves a broken
+  // install that throws on import. Actually load it.
+  try { execSync(`node -e "import('sharp').then(()=>process.exit(0)).catch(()=>process.exit(1))"`,
+    { cwd: ROOT, stdio: 'ignore' }); return true; } catch { return false; }
+};
+
 const PROBES = {
-  'sharp':                    () => hasModule('sharp'),
+  'sharp':                    () => hasModule('sharp') && sharpLoads(),
   'ImageMagick':              () => hasBinary('magick') || hasBinary('convert'),
-  'Pillow':                   () => hasBinary('python') || hasBinary('python3') || hasBinary('py'),
+  'Pillow':                   () => canImportPIL(),
   'Local diffusion runtime':  () => hasEnv('LOCAL_DIFFUSION_URL'),
   'Public JSON endpoints':    () => true,   // no auth, always available
   'WebSearch and WebFetch':   () => true,   // every supported runtime has these

@@ -13,12 +13,9 @@ for %%d in (core\agents packs\seo\agents packs\social\agents) do (
 )
 if "%FILE%"=="" ( echo unknown agent: %AGENT% & exit /b 1 )
 
-if not exist _host\logs mkdir _host\logs
-set PROMPT=Run one complete run of the agent defined in %FILE%. Read that file and core/AGENT-OPERATING-CONTRACT.md first, then do exactly one run's work and exit per its completion criteria.
-
-if defined OTM_RUNNER (
-  %OTM_RUNNER% "%PROMPT%" > _host\logs\%AGENT%-last-run.log 2>&1
-) else (
-  claude -p "%PROMPT%" > _host\logs\%AGENT%-last-run.log 2>&1
-)
-endlocal
+rem Single-instance + timeout are enforced by a tiny node wrapper so the same
+rem discipline holds whether the trigger is Task Scheduler, the bridge, or a
+rem human. The wrapper writes a run marker, honors a monthly day-gate, and
+rem kills a run that overruns OTM_RUN_TIMEOUT_MIN (default 20).
+node "_host\run-wrap.mjs" "%AGENT%" "%FILE%"
+exit /b %ERRORLEVEL%

@@ -27,13 +27,20 @@ foreach ($agent in $schedules.PSObject.Properties.Name) {
       'daily'   { New-ScheduledTaskTrigger -Daily -At $t }
       'twice'   { New-ScheduledTaskTrigger -Daily -At $t }
       'weekly'  { New-ScheduledTaskTrigger -Weekly -DaysOfWeek ($s.day ?? 'Monday') -At $t }
-      'monthly' { New-ScheduledTaskTrigger -Daily -At $t }  # gated below
+      'hourly'  { $tr = New-ScheduledTaskTrigger -Once -At (Get-Date).Date; $tr.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date).Date -RepetitionInterval (New-TimeSpan -Hours 1)).Repetition; $tr }
+      'monthly' {
+        # Real monthly trigger via schtasks (PS cmdlets lack a clean monthly
+        # builder). The run-wrap day-gate is the belt to this suspenders, so a
+        # daily fallback here would still be caught; but we register it monthly.
+        $d = if ($s.day) { $s.day } else { '1' }
+        schtasks /Create /TN $taskName /TR "`"$(Join-Path $PSScriptRoot 'run-agent.cmd')`" $agent" /SC MONTHLY /D $d /ST ($t) /F | Out-Null
+        Write-Host "task     $taskName  monthly day $d $t (via schtasks)"
+        $null  # skip the Register-ScheduledTask path below
+      }
       default   { New-ScheduledTaskTrigger -Daily -At $t }
     }
   }
-  # monthly: schtasks monthly triggers are awkward from PS; the runner itself
-  # no-ops unless it is the configured day, which the agent's own idempotency
-  # (rule 8) already guarantees. Documented, not hidden.
+  if (-not $triggers) { continue }   # monthly already handled by schtasks
   $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopIfGoingOnBatteries
   Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $triggers -Settings $settings -Force | Out-Null
   Write-Host "task     $taskName  $($s.cadence) $($s.time)"
