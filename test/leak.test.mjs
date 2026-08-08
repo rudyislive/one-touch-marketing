@@ -40,8 +40,11 @@ function walk(dir, base = '') {
 
 let files;
 try {
-  files = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-    .split('\n').filter(Boolean);
+  // tracked AND new-but-not-ignored files, so a brand-new file cannot slip past
+  // the scan locally and only fail once committed on CI.
+  const tracked = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const untracked = execSync('git ls-files --others --exclude-standard', { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  files = [...tracked.split('\n'), ...untracked.split('\n')].filter(Boolean);
   if (!files.length) throw new Error('empty');
 } catch {
   files = walk('');
