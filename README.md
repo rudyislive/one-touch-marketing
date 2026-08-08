@@ -32,6 +32,22 @@ Clone it, run `/onboard`, connect nothing. The fleet still runs: it plans, draft
 
 `node tools/doctor.mjs` tells you at any moment what is connected, what is running on a substitute, and what is in handoff mode.
 
+## Recommended connectors
+
+Each lane has a best pick and free alternatives. Full list with alternatives in [docs/CONNECTORS.md](docs/CONNECTORS.md); `/onboard` binds what you already have.
+
+| Lane | Connect first (★) | Free fallback |
+|---|---|---|
+| **Website content** | **WordPress MCP** or **Hostinger MCP** (manage your site's content) | Git-based publishing, or paste-ready cards |
+| Images / video | Higgsfield MCP | Claude in Chrome → your Gemini/ChatGPT, or local |
+| Social scheduling | Postiz MCP (self-hostable) | Manual post from the card |
+| SEO / AI-answer tracking | Ubersuggest or Semrush MCP | Search Console + public crawl |
+| Analytics | PostHog MCP | Platform-native + scheduler metrics |
+| Listening | Public JSON + web search (no account) | already free |
+| Approval gate | Telegram (own bot) for phone approval | Git, or in-agent `/review-queue` |
+
+**If you run a website, connect your CMS first.** WordPress MCP or Hostinger MCP, whichever matches where your site lives. That is where drafts land for one-tap approval.
+
 ## Install, one line
 
 **In Claude Code** (recommended):

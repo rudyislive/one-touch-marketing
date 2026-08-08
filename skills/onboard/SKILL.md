@@ -65,12 +65,15 @@ Record the posture line at the top of `HOUSE-RULES.md`. It is a dial the operato
 
 You already know what is connected. Walk the capability slots each chosen pack declares and resolve every one, out loud, quickly.
 
+The priority pick per lane, and the alternatives beneath it, are in `docs/CONNECTORS.md`. Lead with the priority pick when a lane's slot is empty. **If they have a website, the CMS slot comes first**: recommend WordPress MCP or Hostinger MCP by name (whichever matches where their site lives), because that is where drafts land for one-tap approval. Then images (Higgsfield, or the free Chrome path), then social scheduling (Postiz), then the rest.
+
 For each slot, in this order:
 
 1. **Connected and it fits.** Bind it. Say so in one line and move on.
-2. **Not connected, but something else they have can do it.** The pack manifest's `alternatives` list is ranked. Name the substitute, say what it costs them versus the first choice, and bind it if they agree.
-3. **Nothing connected, but a no-auth option exists.** Name it and bind it. Several slots have options needing no key at all.
-4. **Nothing available.** Tell them plainly which agents drop to handoff mode, what that means in practice (the work still gets done, it arrives as a card with paste-ready steps instead of publishing itself), and what they would need to connect later to close it. Then move on.
+2. **Not connected: name the priority pick first.** From `docs/CONNECTORS.md`, name the ★ pick for this lane (WordPress/Hostinger for CMS, Higgsfield for images, Postiz for scheduling, and so on), one line on why it is the best option, and offer to help them connect it.
+3. **They have something else that fits.** The pack manifest's `alternatives` list is ranked. Name the substitute, say what it costs versus the priority pick, bind it if they agree.
+4. **Nothing connected, but a no-auth option exists.** Name it and bind it. Several slots have free options: the Chrome image path, git-based publishing, paste-ready cards, public-JSON listening.
+5. **Nothing available.** Tell them plainly which agents drop to handoff mode, what that means (the work still gets done, it arrives as a paste-ready card instead of publishing itself), and what to connect later to close it. Then move on.
 
 Never end this section with a to-do list of things they must go connect before the system works. **The system works now.** Connecting things later only removes manual steps.
 

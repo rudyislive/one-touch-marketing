@@ -30,8 +30,18 @@ capabilities:
     required_by: [content-drafter, copy-editor, faq-syncer, per-publish, link-applier]
     on_absent: degrade
     alternatives:
-      - name: Any CMS MCP or write API
-        note: Bind in binding/TOOLS.md. Drafts land in the CMS as unpublished drafts, never live.
+      - name: WordPress MCP
+        note: >
+          Priority pick for a WordPress site. Drafts land as unpublished
+          WordPress drafts; the gate approves, then it publishes. Nothing
+          reaches the live site without a human tap.
+      - name: Hostinger MCP
+        note: >
+          Priority pick for a site hosted on Hostinger. Manages content and
+          the site from one connector. Equal to WordPress MCP; pick by where
+          the site lives.
+      - name: Any other CMS MCP or write API
+        note: Webflow, Ghost, Sanity, Contentful, headless. Bind in binding/TOOLS.md. Identical pipeline.
       - name: Git-based publishing
         auth: none
         note: Static sites. The draft is a file and a pull request; merging is publishing.
