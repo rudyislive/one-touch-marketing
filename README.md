@@ -61,8 +61,10 @@ then `/plugin install one-touch-marketing`, and say `/onboard`.
 **Anywhere else:**
 
 ```
-npx github:rudyislive/one-touch-marketing init
+npx one-touch-marketing init
 ```
+
+(or `npx github:rudyislive/one-touch-marketing init` to install straight from this repo)
 
 That copies the framework in, installs dependencies, prints what you have connected, and stops. Then open the folder in your agent runtime and say `/onboard`.
 

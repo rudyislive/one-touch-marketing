@@ -11,3 +11,4 @@ state/.claims/
 state/.counters/
 state/.running/
 .DS_Store
+*.tgz
