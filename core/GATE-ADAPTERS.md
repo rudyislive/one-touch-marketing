@@ -66,6 +66,8 @@ A host-side bridge that makes the chat a full control surface, not a notificatio
 
 **Approval can chain.** `on_approve: trigger-next` in the bridge config fires the downstream agent the moment its input is approved (visual after copy, publisher after visual), collapsing the draft-to-scheduled loop into minutes when the human is responsive. Off by default; the scheduled cadence is the fallback either way.
 
+**One bot token serves exactly one bridge.** Telegram's `getUpdates` is a consuming, single-reader operation: if two processes poll the same token, whichever polls first eats each update and the other never sees it. So do not point this bridge at a bot token another bridge (or another copy of this one) is already polling; taps vanish silently with no error. Give this framework its own bot from BotFather. The bridge does not detect the conflict for you, because from its side the collision is indistinguishable from an empty queue.
+
 Setup: a bot token in `.env`, the chat id in `binding/TOOLS.md`, the bridge process registered by the host runner. Host-side for the same reason the publisher is: it watches this machine's queue, and this machine is where approved work executes and where rework re-launches. The same pattern ports to Slack or Discord by swapping the send and receive calls; documented, not shipped.
 
 ## Opting agents out
