@@ -70,6 +70,16 @@ Onboarding is a conversation, not a config file: what you are building, what you
 
 The onboarding is an interview, not a config file. It asks what you are building, what you want out in the world, how you sound and who approves; it discovers your tools itself; and it ends by producing your first real draft, so you see the whole loop close in your first session.
 
+## Updating
+
+Installs are snapshots; nothing auto-updates. To pull a newer version into an existing install:
+
+```
+npx github:rudyislive/one-touch-marketing update
+```
+
+It refreshes the framework code and leaves your `binding/` (identity, voice, tools), your `state/` (queue, ledgers, cache, ideas) and your `.env` untouched. Any new binding file a version adds is dropped in without overwriting yours. Installed as a Claude Code plugin? `/plugin update one-touch-marketing`. Cloned with git? `git pull` (stash your `binding/` edits first, since those files are tracked).
+
 ## Status
 
 v0.1. The reference deployment runs in production at a fintech startup in India. The contract, the queue, the compositor and the placement doctrine are battle-tested; the packaging you are looking at is new. Issues and pull requests welcome.

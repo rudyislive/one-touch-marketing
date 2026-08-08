@@ -30,12 +30,16 @@ ${C.b}one-touch-marketing${C.off}
   ${C.b}npx github:rudyislive/one-touch-marketing init [dir]${C.off}
       Install into [dir] (default: ./one-touch-marketing)
 
+  ${C.b}npx github:rudyislive/one-touch-marketing update [dir]${C.off}
+      Refresh framework code in an existing install. Your binding/, state/
+      and .env are kept untouched. (init on an existing install does the same.)
+
   Already inside a copy? Just open it in Claude Code and say /onboard.
 `);
   process.exit(0);
 }
 
-if (cmd !== 'init') { console.error(`unknown command: ${cmd}. Try --help.`); process.exit(1); }
+if (!['init', 'update'].includes(cmd)) { console.error(`unknown command: ${cmd}. Try --help.`); process.exit(1); }
 
 const target = resolve(argv[1] ?? 'one-touch-marketing');
 
@@ -51,22 +55,38 @@ if (major < 18) {
 }
 
 // 2. place the files
-if (existsSync(target) && readdirSync(target).length) {
-  const hasFramework = existsSync(join(target, 'core', 'AGENT-OPERATING-CONTRACT.md'));
-  if (!hasFramework) {
-    console.error(`${target} exists and is not empty. Pick an empty directory.`);
-    process.exit(1);
-  }
-  step(`Updating the copy already in ${target}`);
-} else {
-  step(`Installing into ${target}`);
-  mkdirSync(target, { recursive: true });
+const hasFramework = existsSync(join(target, 'core', 'AGENT-OPERATING-CONTRACT.md'));
+const updating = hasFramework;
+if (existsSync(target) && readdirSync(target).length && !hasFramework) {
+  console.error(`${target} exists and is not empty. Pick an empty directory.`);
+  process.exit(1);
 }
+mkdirSync(target, { recursive: true });
+step(updating ? `Updating the framework in ${target}` : `Installing into ${target}`);
 
+// The framework CODE is refreshed; the user's DATA is never touched.
+//   never copied: node_modules, .git, build, state (their queue/ledgers/cache),
+//                 .env (their secrets)
+//   copy-if-missing on update: binding (their identity/voice/tools) and
+//                 examples never overwrite what they have filled in, but a NEW
+//                 binding file a later version ships still lands.
 const SKIP = new Set(['node_modules', '.git', 'build', 'state', '.env']);
+const PRESERVE = new Set(['binding']);   // dirs whose existing files survive update
 for (const entry of readdirSync(SELF)) {
   if (SKIP.has(entry)) continue;
-  cpSync(join(SELF, entry), join(target, entry), { recursive: true, force: true });
+  const src = join(SELF, entry), dst = join(target, entry);
+  if (updating && PRESERVE.has(entry)) { copyMissing(src, dst); continue; }
+  cpSync(src, dst, { recursive: true, force: true });
+}
+
+// copy only files that do not already exist at the destination (recursive)
+function copyMissing(src, dst) {
+  mkdirSync(dst, { recursive: true });
+  for (const name of readdirSync(src, { withFileTypes: true })) {
+    const s = join(src, name.name), d = join(dst, name.name);
+    if (name.isDirectory()) copyMissing(s, d);
+    else if (!existsSync(d)) cpSync(s, d);
+  }
 }
 
 // state ships as empty scaffolding, never overwritten on update
@@ -102,7 +122,18 @@ try {
 }
 
 // 5. one next step, and only one
-say(`
+if (updating) {
+  say(`
+${C.g}Updated.${C.off} Framework code refreshed to this version.
+
+${C.dim}Kept exactly as they were: your binding/ (identity, voice, tools),
+your state/ (queue, ledgers, cache, ideas) and your .env. Any new binding
+file this version adds was dropped in without touching your existing ones.${C.off}
+
+  Run ${C.b}/doctor${C.off} if your connectors changed, ${C.b}/status${C.off} to see where things stand.
+`);
+} else {
+  say(`
 ${C.g}Done.${C.off} Nothing else needs configuring here.
 
   ${C.b}1.${C.off} Open ${target} in Claude Code
@@ -115,3 +146,4 @@ ends by putting a real draft in front of you.
 ${C.dim}Nothing above needs to be connected first. With zero connectors the fleet
 still drafts, plans and illustrates; it just hands you the last mile.${C.off}
 `);
+}
